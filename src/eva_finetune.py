@@ -3,6 +3,7 @@
 """Finetune EVA"""
 
 import os
+try_data = None
 import json
 import torch
 import mpu
@@ -248,11 +249,12 @@ def backward_step(args, loss, model, optimizer):
                 optimizer.clip_master_grads(args.clip_grad)
 
 
-def train(args, tokenizer, model, optimizer, lr_scheduler, train_dataset, train_dataloader, dev_dataset, dev_dataloader, device):
+def train(args, tokenizer, model, optimizer, lr_scheduler, train_dataset, train_dataloader, dev_dataset, dev_dataloader, device, start_step=-1):
     """Train the model."""
 
-    # Turn on training mode which enables dropout.
-    model.train()
+    # Turn on training mode which enables dropout.\
+    if not try_data:
+        model.train()
 
     # Tracking loss.
     total_loss = 0.0
@@ -260,65 +262,94 @@ def train(args, tokenizer, model, optimizer, lr_scheduler, train_dataset, train_
     step, global_step = 1, 1
 
     for e in range(args.epochs):
-        model.train()
+        # print('epochs')
+        if not try_data:
+            model.train()
         for model_batch, no_model_batch in train_dataloader:
+            # print('loader')
+            if start_step > 0 and global_step <= start_step:
+                global_step += 1
+                continue
+            elif global_step == start_step + 1:
+                print(f'!!! Training restore from step {global_step}')
             for k in model_batch:
                 model_batch[k] = model_batch[k].to(device)
             for k in no_model_batch:
                 no_model_batch[k] = no_model_batch[k].to(device)
-            forw_out = forward_step(args, model_batch, no_model_batch, model, device)
-            loss = forw_out["loss"]
+            if not try_data:
+                forw_out = forward_step(args, model_batch, no_model_batch, model, device)
+                loss = forw_out["loss"]
+            else:
+                loss = 0.1
             
-            if torch.distributed.get_rank() == 0:
+            if not try_data and torch.distributed.get_rank() == 0:
                 print(loss)
 
-            backward_step(args, loss, model, optimizer)
+            if not try_data:
+                backward_step(args, loss, model, optimizer)
 
             # Update losses.
-            total_loss += loss.item()
+            if not try_data:
+                total_loss += loss.item()
+            else:
+                total_loss += loss
 
             if args.deepspeed:
-                model.step()
+                # pass
+                if not try_data:
+                    model.step()
             else:
-                optimizer.step()
-                if not (args.fp16 and optimizer.overflow):
-                    lr_scheduler.step()
+                # pass
+                if not try_data:
+                    optimizer.step()
+                    if not (args.fp16 and optimizer.overflow):
+                        lr_scheduler.step()
 
             # Logging.
             if global_step % args.log_interval == 0 and step % args.gradient_accumulation_steps == 0:
-                learning_rate = optimizer.param_groups[0]['lr']
+                if not try_data:
+                    learning_rate = optimizer.param_groups[0]['lr']
+                else:
+                    learning_rate = 0.5
                 avg_lm_loss = total_loss / (args.log_interval * args.gradient_accumulation_steps)
                 log_string = 'epoch {:3d}/{:3d} |'.format(e, args.epochs)
                 log_string += ' global iteration {:8d}/{:8d} |'.format(global_step, args.train_iters)
                 log_string += ' learning rate {:.3} |'.format(learning_rate)
                 log_string += ' lm loss {:.6} |'.format(avg_lm_loss)
                 if args.fp16:
-                    log_string += ' loss scale {:.1f} |'.format(optimizer.cur_scale if args.deepspeed else optimizer.loss_scale)
+                    if not try_data:
+                        log_string += ' loss scale {:.1f} |'.format(optimizer.cur_scale if args.deepspeed else optimizer.loss_scale)
+                    else:
+                        log_string = '123 log str 123'
                 print_rank_0(log_string)
                 save_rank_0(args, log_string)
                 total_loss = 0.0
+            if not try_data:
+                # Checkpointing
+                if args.save and args.save_interval and global_step % args.save_interval == 0 and step % args.gradient_accumulation_steps == 0:
+                    if dist.get_rank() == 0:
+                        log_string = f'Save model at global_step {global_step}'
+                        print_rank_0(log_string)
+                        save_rank_0(args, log_string)
+                    save_checkpoint(global_step, model, optimizer, lr_scheduler, args)
 
-            # Checkpointing
-            if args.save and args.save_interval and global_step % args.save_interval == 0 and step % args.gradient_accumulation_steps == 0:
-                save_checkpoint(global_step, model, optimizer, lr_scheduler, args)
+                # Evaluation
+                if args.eval_interval and global_step % args.eval_interval == 0 and step % args.gradient_accumulation_steps == 0 and args.do_valid:
+                    prefix = 'iteration {} | '.format(global_step)
+                    eval_loss, metric_res, _ = evaluate(args, tokenizer, dev_dataset, dev_dataloader, model, device, mode="dev")
+                    model.train()
+                    if len(metric_res) > 1:
+                        log_string = prefix
+                        for key, value in metric_res.items():
+                            log_string += " {}: {:.5} | ".format(key, value)
+                    else:
+                        log_string = prefix + " eval_loss: " + str(eval_loss)
+                    print_rank_0(log_string)
+                    save_rank_0(args, log_string)
 
-            # Evaluation
-            if args.eval_interval and global_step % args.eval_interval == 0 and step % args.gradient_accumulation_steps == 0 and args.do_valid:
-                prefix = 'iteration {} | '.format(global_step)
-                eval_loss, metric_res, _ = evaluate(args, tokenizer, dev_dataset, dev_dataloader, model, device, mode="dev")
-                model.train()
-                if len(metric_res) > 1:
-                    log_string = prefix
-                    for key, value in metric_res.items():
-                        log_string += " {}: {:.5} | ".format(key, value)
-                else:
-                    log_string = prefix + " eval_loss: " + str(eval_loss)
-                print_rank_0(log_string)
-                save_rank_0(args, log_string)
-
-            step += 1
-            if step % args.gradient_accumulation_steps == 0:
-                global_step += 1
+                step += 1
+                if step % args.gradient_accumulation_steps == 0:
+                    global_step += 1
 
     # end train
     if args.save:
@@ -434,6 +465,7 @@ def main():
 
     # Arguments.
     args = get_args()
+    try_data = args.build_data_cache
 
     os.makedirs(args.save, exist_ok=True)
     config = EVAConfig.from_json_file(args.model_config)
@@ -469,6 +501,7 @@ def main():
     if args.do_train:
         train_dataloader, train_dataset, _ = load_data(args, 'train', tokenizer, ratio=args.train_ratio)
         dev_dataloader, dev_dataset, _  = load_data(args, 'valid', tokenizer, ratio=args.valid_ratio)
+        # exit()
         if args.train_iters == -1:
             args.train_iters = len(train_dataset) * args.epochs // (mpu.get_data_parallel_world_size() * args.batch_size * args.gradient_accumulation_steps)
         if args.save_interval == -1:
@@ -483,12 +516,16 @@ def main():
     save_rank_0(args, log_string)
 
     # Model, optimizer, and learning rate.
-    model, optimizer, lr_scheduler = setup_model_and_optimizer(args, config, ds_config, args.do_train)
+    if try_data:
+        model, optimizer, lr_scheduler = None, None, None
+    else:
+        model, optimizer, lr_scheduler = setup_model_and_optimizer(args, config, ds_config, args.do_train)
         
-    if args.do_train:
-        train(args, tokenizer, model, optimizer, lr_scheduler, train_dataset, train_dataloader, dev_dataset, dev_dataloader, device)
+    if args.do_train and not try_data:
+        print('start train')
+        train(args, tokenizer, model, optimizer, lr_scheduler, train_dataset, train_dataloader, dev_dataset, dev_dataloader, device, start_step=args.start_step)
 
-    if args.do_eval:
+    if args.do_eval and not try_data:
         eval_dataloader, eval_dataset, _ = load_data(args, 'test', tokenizer, ratio=args.test_ratio)
         loss, metrics, generation = evaluate(args, tokenizer, eval_dataset, eval_dataloader, model, device, mode="test")
         log_string = "Eval result: "

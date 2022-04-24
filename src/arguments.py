@@ -37,6 +37,8 @@ def add_training_args(parser: argparse.ArgumentParser):
 
     group = parser.add_argument_group("train", "training configurations")
 
+    group.add_argument("--build_data_cache", type=bool, default=False,
+                       help="Only do data pre-processing to setup data cache.")
     group.add_argument("--do-train", action="store_true", 
                         help="Do model training.")
     group.add_argument("--do-valid", action="store_true", 
@@ -109,6 +111,9 @@ def add_training_args(parser: argparse.ArgumentParser):
 
     group.add_argument("--local_rank", type=int, default=None,
                        help="Local rank passed from distributed launcher.")
+
+    group.add_argument("--start_step", type=int, default=-1,
+                       help="Restore last global step.")
 
     return parser
 

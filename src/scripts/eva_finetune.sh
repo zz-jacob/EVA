@@ -1,21 +1,39 @@
 #! /bin/bash
 
-WORKING_DIR=/home/coai/eva-interactive/
+WORKING_DIR=/home/zhangzheng/DebtCollection_EVA/
 
 MP_SIZE=1 # the model parallel size
 
 NUM_GPUS_PER_WORKER=4 # number of gpus used on one node
+GPU_IDS="0,2,3,4"
+PORT='1237'
 
-DATA_PATH="${WORKING_DIR}/data/kdconv" # path of the directory of the dataset
+DATA_PROCESS_ONLY="False"  # !!! MUST CHECK Before Running !!!
 
-CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva1.0_model_config.json"
-CKPT_PATH="${WORKING_DIR}/checkpoints/eva1.0"
+#DATA_PATH="${WORKING_DIR}/data/kdconv"
+#CACHE_PATH="./cache_data_kd"
+#CKPT_PATH="${WORKING_DIR}/model/eva2.0"
+#SAVE_PATH="${WORKING_DIR}/results/finetune/"
+
+#DATA_PATH="/home/zhangzheng/qingdao_data_small" # path of the directory of the dataset
+#CACHE_PATH="./cache_data_qingdao_small"
+#CKPT_PATH="${WORKING_DIR}/results_qingdao/finetune/7000"
+#SAVE_PATH="${WORKING_DIR}/results_qingdao/finetune/"
+
+DATA_PATH="${WORKING_DIR}/data/qingdao_data_full" # path of the directory of the dataset
+CACHE_PATH="./cache_data_qingdao_full"
+#CKPT_PATH="${WORKING_DIR}/model/eva2.0"
+#CKPT_PATH="${WORKING_DIR}/results_qingdao_full_0421/finetune/"
+#SAVE_PATH="${WORKING_DIR}/results_qingdao_full_0421/finetune/"
+CKPT_PATH="${WORKING_DIR}/model/eva2.0"
+SAVE_PATH="${WORKING_DIR}/results_qingdao_full_0423/finetune/"
+
+CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva2.0_model_config.json"
 
 LR=${2-0.0001} # learning rate
 WM=${3-0.01} # ratio of warmup steps
-GRAD_ACC=${4-1} # gradient accumulation steps
+GRAD_ACC=${4-2} # gradient accumulation steps
 
-SAVE_PATH="${WORKING_DIR}/results/finetune/"
 LOG_FILE="${SAVE_PATH}/log.txt"
 DS_CONFIG="${WORKING_DIR}/src/configs/deepspeed/eva_ds_config.json" # config of deepspeed
 TOKENIZER_PATH="${WORKING_DIR}/bpe_dialog_new" # vocab path
@@ -62,9 +80,14 @@ OPTS+=" --do-valid"
 OPTS+=" --do-eval"
 # OPTS+=" --eval-generation" # run the evaluation of generation
 OPTS+=" --train-ratio 1"
+OPTS+=" --cache-path ${CACHE_PATH}"
+#OPTS+=" --build_data_cache ${DATA_PROCESS_ONLY}"
+OPTS+=" --start_step 12000"
 
-CMD="torchrun --master_port 1234 --nproc_per_node ${NUM_GPUS_PER_WORKER} ${WORKING_DIR}/src/eva_finetune.py ${OPTS}"
 
+CMD="torchrun --master_port ${PORT} --nproc_per_node ${NUM_GPUS_PER_WORKER} ${WORKING_DIR}/src/eva_finetune.py ${OPTS}"
+
+export CUDA_VISIBLE_DEVICES=${GPU_IDS}
 echo ${CMD}
 mkdir -p ${SAVE_PATH}
 ${CMD} 2>&1 | tee ${SAVE_PATH}/train_log

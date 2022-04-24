@@ -1,13 +1,16 @@
 #! /bin/bash
 
-WORKING_DIR=/home/coai/eva-interactive/
+WORKING_DIR=/home/zhangzheng/DebtCollection_EVA/
 
 MP_SIZE=1
 
 NUM_GPUS_PER_WORKER=1
 
-CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva1.0_model_config.json"
-CKPT_PATH="${WORKING_DIR}/checkpoints/eva1.0"
+export CUDA_VISIBLE_DEVICES='0'
+
+CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva2.0_model_config.json"
+CKPT_PATH="${WORKING_DIR}/results_qingdao_full/finetune"
+# CKPT_PATH="${WORKING_DIR}/model/eva2.0"
 
 DS_CONFIG="${WORKING_DIR}/src/configs/deepspeed/eva_ds_config.json"
 TOKENIZER_PATH="${WORKING_DIR}/bpe_dialog_new"
@@ -40,7 +43,7 @@ OPTS+=" --fp16"
 OPTS+=" --deepspeed"
 OPTS+=" --deepspeed_config ${DS_CONFIG}"
 
-CMD="torchrun --master_port 1234 --nproc_per_node ${NUM_GPUS_PER_WORKER} ${WORKING_DIR}/src/eva_interactive.py ${OPTS}"
+CMD="torchrun --master_port 1237 --nproc_per_node ${NUM_GPUS_PER_WORKER} ${WORKING_DIR}/src/eva_interactive.py ${OPTS}"
 
 echo ${CMD}
 ${CMD}

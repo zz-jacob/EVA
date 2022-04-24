@@ -51,24 +51,30 @@ class EVADataset(Dataset):
 
         with open(path, "r") as f:
             lines = f.readlines()
-        
+
+        # line_count = -1
         for line in tqdm(lines[:int(self.ratio * len(lines))], desc="Loading data from {}".format(path), disable=(dist.get_rank() != 0)):
+            # line_count += 1
             line = line.strip().split("\t")
             line = [self.tokenizer.encode(utt) for utt in line]
+            # print([type(item) for item in line])
             if len(line) == 1:
-                context = line[0]
+                context = line
                 target = [0, 0] # empty dial
             else:
                 context = line[:-1]
                 target = line[-1]
 
             trunc_context = []
+            # c_count = -1
             for c in context[::-1]:
+                # c_count += 1
+                # print(line_count, c_count)
                 if len(c) + len(trunc_context) + 1 + 1 <= self.max_enc_len: # first 1 for <sep>, second 1 for <s_0>
                     trunc_context = c + [self.tokenizer.sep_id] + trunc_context
                 else:
                     break
-            if len(trunc_context) > 0 and len(target) <= self.max_dec_len:
+            if len(trunc_context) > 0 and len(target) < self.max_dec_len:
                 trunc_context = trunc_context + [self.tokenizer.get_sentinel_id(0)]
                 target = [self.tokenizer.get_sentinel_id(0)] + target + [self.tokenizer.sep_id]
                 contexts.append(trunc_context)
