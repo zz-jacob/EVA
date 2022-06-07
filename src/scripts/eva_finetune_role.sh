@@ -6,7 +6,7 @@ MP_SIZE=1 # the model parallel size
 
 NUM_GPUS_PER_WORKER=4 # number of gpus used on one node
 GPU_IDS="0,1,2,3"
-PORT='1234'
+PORT='1236'
 
 
 #DATA_PATH="${WORKING_DIR}/data/kdconv"
@@ -31,7 +31,9 @@ PORT='1234'
 # SAVE_PATH="${WORKING_DIR}/results_qingdao_full_0423/finetune/"
 
 DATA_PATH="${WORKING_DIR}/data/debtcollection_role" # path of the directory of the dataset
-CACHE_PATH="${DATA_PATH}/.cache"
+ENC_LEN=190 # max input length of encoder
+DEC_LEN=164 # max input length of decoder
+CACHE_PATH="${DATA_PATH}/.cache_en190_de64"
 CKPT_PATH="${WORKING_DIR}/../eva2.0"
 SAVE_PATH="${WORKING_DIR}/results/debtcollection_role/finetune/"
 
@@ -45,16 +47,13 @@ LOG_FILE="${SAVE_PATH}/log.txt"
 DS_CONFIG="${WORKING_DIR}/src/configs/deepspeed/eva_ds_config.json" # config of deepspeed
 TOKENIZER_PATH="${WORKING_DIR}/bpe_dialog_new" # vocab path
 
-BATCH_SIZE=16
+BATCH_SIZE=8
 TRAIN_ITER=-1 # total number of train iterations, if set to -1, the iterations depend on the training epochs (epochs * data_size / (batch_size * grad_acc) )
 EPOCHS=3
 
-ENC_LEN=190 # max input length of encoder
-DEC_LEN=64 # max input length of decoder
-
 
 OPTS=""
-#OPTS+=" --build_data_cache"
+# OPTS+=" --build_data_cache"
 OPTS+=" --use_role_label"
 OPTS+=" --model-config ${CONFIG_PATH}"
 OPTS+=" --model-parallel-size ${MP_SIZE}"
