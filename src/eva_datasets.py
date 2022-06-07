@@ -26,7 +26,7 @@ class EVADataset(Dataset):
 
         if cache_path is None or not os.path.exists(os.path.join(cache_path, split + ".pkl")):
             print_rank_0("No cache, processing data")
-            self.contexts, self.targets, self.labels = self.preprocess(path)
+            self.contexts, self.targets, self.labels = self.preprocess(path) if not args.use_role_label else self.preprocess_for_role(path)
             if dist.get_rank() == 0:
                 if cache_path is not None:
                     os.makedirs(cache_path, exist_ok=True)
@@ -82,6 +82,62 @@ class EVADataset(Dataset):
                 labels.append(target[1:])
             else:
                 continue
+
+        return contexts, targets, labels
+
+    def preprocess_for_role(self, path):
+        contexts = []
+        targets = []
+        labels = []
+
+        with open(path, "r") as f:
+            lines = f.readlines()
+
+        # line_count = -1
+        data_count = 0
+        for line in tqdm(lines[:int(self.ratio * len(lines))], desc="Loading data from {}".format(path), disable=(dist.get_rank() != 0)):
+            # line_count += 1
+            line = [item.strip() for item in line.strip().split("\t")]
+            if len(line) == 1: 
+                continue
+            last_sent = line[-1].strip()
+            try:
+                assert(last_sent.startswith('法务:'))
+            except:
+                print('INVALID DATA: [{}]'.format("\t".join(line)))
+                continue
+            line = line[:-1] + ['法务:'] + [last_sent[3:]]
+            line = [self.tokenizer.encode(utt) for utt in line]
+            # print([type(item) for item in line])
+            if len(line) == 1:
+                context = line
+                target = [0, 0] # empty dial
+            else:
+                context = line[:-1]
+                target = line[-1]
+
+            trunc_context = []
+            # c_count = -1
+            for idx, c in enumerate(context[::-1]):
+                # c_count += 1
+                # print(line_count, c_count)
+                if len(c) + len(trunc_context) + 1 + 1 <= self.max_enc_len: # first 1 for <sep>, second 1 for <s_0>
+                    if idx > 0:
+                        trunc_context = c + [self.tokenizer.sep_id] + trunc_context
+                    else:
+                        trunc_context = c + trunc_context
+                else:
+                    break
+            if len(trunc_context) > 0 and len(target) < self.max_dec_len:
+                trunc_context = trunc_context + [self.tokenizer.get_sentinel_id(0)]
+                target = [self.tokenizer.get_sentinel_id(0)] + target + [self.tokenizer.sep_id]
+                contexts.append(trunc_context)
+                targets.append(target[:-1])
+                labels.append(target[1:])
+                data_count += 1
+            else:
+                continue
+        print(f'data size {data_count}, ' + path)
 
         return contexts, targets, labels
 

@@ -19,8 +19,8 @@ PORT='1234'
 #CKPT_PATH="${WORKING_DIR}/results_qingdao/finetune/7000"
 #SAVE_PATH="${WORKING_DIR}/results_qingdao/finetune/"
 
-DATA_PATH="${WORKING_DIR}/data/kdconv" # path of the directory of the dataset
-CACHE_PATH="${DATA_PATH}/.cache"
+# DATA_PATH="${WORKING_DIR}/data/kdconv" # path of the directory of the dataset
+# CACHE_PATH="${DATA_PATH}/.cache"
 
 # DATA_PATH="${WORKING_DIR}/data/qingdao_data_full" # path of the directory of the dataset
 # CACHE_PATH="./cache_data_qingdao_full"
@@ -30,10 +30,10 @@ CACHE_PATH="${DATA_PATH}/.cache"
 # CKPT_PATH="${WORKING_DIR}/../eva2.0"
 # SAVE_PATH="${WORKING_DIR}/results_qingdao_full_0423/finetune/"
 
-DATA_PATH="${WORKING_DIR}/data/kdconv" # path of the directory of the dataset
+DATA_PATH="${WORKING_DIR}/data/debtcollection_role" # path of the directory of the dataset
 CACHE_PATH="${DATA_PATH}/.cache"
 CKPT_PATH="${WORKING_DIR}/../eva2.0"
-SAVE_PATH="${WORKING_DIR}/results/kdconv/finetune/"
+SAVE_PATH="${WORKING_DIR}/results/debtcollection_role/finetune/"
 
 CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva2.0_model_config.json"
 
@@ -49,12 +49,13 @@ BATCH_SIZE=16
 TRAIN_ITER=-1 # total number of train iterations, if set to -1, the iterations depend on the training epochs (epochs * data_size / (batch_size * grad_acc) )
 EPOCHS=3
 
-ENC_LEN=128 # max input length of encoder
-DEC_LEN=128 # max input length of decoder
+ENC_LEN=190 # max input length of encoder
+DEC_LEN=64 # max input length of decoder
 
 
 OPTS=""
 #OPTS+=" --build_data_cache"
+OPTS+=" --use_role_label"
 OPTS+=" --model-config ${CONFIG_PATH}"
 OPTS+=" --model-parallel-size ${MP_SIZE}"
 OPTS+=" --batch-size ${BATCH_SIZE}"

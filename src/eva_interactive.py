@@ -172,11 +172,15 @@ def generate_samples(model, tokenizer: EVATokenizer, args, device):
                     length_tensor = torch.tensor([-1], dtype=torch.long).to(device)
                     continue
                 else:
-                    full_context_list.append(tokenizer.encode(input_text) + [tokenizer.sep_id])
+                    if not args.use_role_label:
+                        full_context_list.append(tokenizer.encode(input_text) + [tokenizer.sep_id])
+                    else:
+                        full_context_list.append(tokenizer.encode('接线人:' + input_text) + [tokenizer.sep_id] + \
+                            tokenizer.encode('法务:'))
                     full_context = [x for y in full_context_list for x in y]
                     trunc_context = []
                     for utt in full_context_list[:-9:-1]:
-                        if len(trunc_context) + len(utt) + 1 <= 128:
+                        if len(trunc_context) + len(utt) + 1 <= args.enc_seq_length:
                             trunc_context = utt + trunc_context
                     trunc_context.append(tokenizer.get_sentinel_id(0))
                     length_tensor = torch.tensor([len(trunc_context), len(full_context)], dtype=torch.long).to(device)

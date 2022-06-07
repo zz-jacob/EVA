@@ -36,9 +36,11 @@ def add_training_args(parser: argparse.ArgumentParser):
     """Training arguments."""
 
     group = parser.add_argument_group("train", "training configurations")
-
-    group.add_argument("--build_data_cache", type=bool, default=False,
+    
+    group.add_argument("--build_data_cache", action="store_true",
                        help="Only do data pre-processing to setup data cache.")
+    group.add_argument("--use_role_label", action="store_true",
+                       help="Whether use role label in data.")
     group.add_argument("--do-train", action="store_true", 
                         help="Do model training.")
     group.add_argument("--do-valid", action="store_true", 
