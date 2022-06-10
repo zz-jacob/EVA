@@ -10,9 +10,9 @@ NUM_GPUS_PER_WORKER=1
 export CUDA_VISIBLE_DEVICES='0'
 
 CONFIG_PATH="${WORKING_DIR}/src/configs/model/eva2.0_model_config.json"
-CKPT_PATH="${WORKING_DIR}/results/debtcollection_role_en190_de64/finetune"
+CKPT_PATH="${WORKING_DIR}/results/debtcollection_usertag_en256_de64/finetune"
 # CKPT_PATH="${WORKING_DIR}/../eva2.0"
-ENC_LEN = 190
+ENC_LEN = 256
 DEC_LEN = 64
 
 DS_CONFIG="${WORKING_DIR}/src/configs/deepspeed/eva_ds_config.json"

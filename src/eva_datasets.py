@@ -51,6 +51,9 @@ class EVADataset(Dataset):
 
         with open(path, "r") as f:
             lines = f.readlines()
+        # 当train.txt处理时间太长时添加
+        # if 'train.txt' in path:
+        #     lines = lines[:int(len(lines)/2)]
 
         # line_count = -1
         for line in tqdm(lines[:int(self.ratio * len(lines))], desc="Loading data from {}".format(path), disable=(dist.get_rank() != 0)):
